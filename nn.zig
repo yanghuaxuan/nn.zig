@@ -3,12 +3,13 @@ const std = @import("std");
 const stdprint = std.debug.print;
 const Allocator = std.mem.Allocator;
 
+/// The *real* matrix is dynamically allocated
 const Mat = struct {
   rows: usize,
   cols: usize,
   m: [][]f32,
 
-  /// Returns a new dynamically allocated matrix
+  /// Returns a new initialized matrix
   pub fn New(rows: usize, cols: usize, allocator: *const Allocator) !Mat {
     const m = try allocator.alloc([]f32, rows);
     // var start: usize = 0;
