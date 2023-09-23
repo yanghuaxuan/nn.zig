@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const stdprint = std.debug.print;
 const Allocator = std.mem.Allocator;
 
@@ -25,7 +26,9 @@ const Mat = struct {
     };
   }
   /// Dot products this matrix by matrix B, storing its result in dest
-  pub fn dot(self: *const Mat, dest: *Mat, B: *Mat) !void {
+  ///
+  /// Returns an error if the number of rows in matrix B != number of cols in this matrix
+  pub fn Dot(self: *const Mat, dest: *Mat, B: *Mat) !void {
     if (self.cols != B.rows) {
         return error.InvalidMatrixLength;
     }
@@ -36,8 +39,15 @@ const Mat = struct {
     }
   }
 
+  pub fn At(self: *const Mat, i: usize, j: usize) ?f32 {
+    if (i > self.rows or j > self.cols) {
+        return null;
+    }
+    return self.m[i][j];
+  }
+
   /// Print visual representation of matrix
-  pub fn print(self: *const Mat) void {
+  pub fn Print(self: *const Mat) void {
     for (self.m) |*row| {
         stdprint("[ ", .{});
         for (row.*) |*col| {
@@ -46,16 +56,40 @@ const Mat = struct {
         stdprint("]\n", .{});
     }
   }
+
+  /// Randomize values in matrix
+  pub fn Randomize(self: *const Mat, floor: i32, ceil: i32) void {
+    const cTime = @cImport(@cInclude("time.h"));
+
+    var r = std.rand.DefaultPrng.init(@intCast(cTime.time(null)));
+
+    for (self.m) |*row| {
+        for (row.*) |*col| {
+            col.* = r
+                .random()
+                .float(f32) * (@as(f32, @floatFromInt(ceil)) - @as(f32, @floatFromInt(floor))) + @as(f32, @floatFromInt(floor));
+        }
+    }
+  }
 };
 
 pub fn main() !void {
     var alo = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer alo.deinit();
+
     const rows = 5;
     const cols = 2;
-    defer alo.deinit();
 
     const matrix = try Mat.New(rows, cols, &alo.allocator());
     // _ = matrix;
     matrix.m[0][1] = 1;
-    matrix.print();
+    matrix.Print();
+    stdprint("\n", .{});
+    stdprint("[7, 2]: {d}\n", .{matrix.At(7, 2) orelse 0});
+    stdprint("\n", .{});
+    matrix.Randomize(1, 4);
+    matrix.Print();
+    // const twobytwo_1 = try Mat.New(2, 2, &alo.allocator());
+    // const twobytwo_2 = try Mat.New(2, 2, &alo.allocator());
+    // const res = try Mat.New(2, 2, &alo.allocator());
 }
