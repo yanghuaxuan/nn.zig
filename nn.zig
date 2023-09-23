@@ -1,5 +1,5 @@
 const std = @import("std");
-const print = std.debug.print;
+const stdprint = std.debug.print;
 const Allocator = std.mem.Allocator;
 
 const Mat = struct {
@@ -10,10 +10,10 @@ const Mat = struct {
 
   /// Returns a new dynamically allocated matrix
   pub fn New(rows: usize, cols: usize, allocator: *const Allocator) !Mat {
-    const m = try allocator.alloc([]f32, @sizeOf(f32) * rows);
+    const m = try allocator.alloc([]f32, rows);
     // var start: usize = 0;
     for (0..rows) |i| {
-        m[i] = try allocator.alloc(f32, @sizeOf(f32) * cols);
+        m[i] = try allocator.alloc(f32, cols);
         for (0..cols) |a| {
             m[i][a] = 0;
         }
@@ -25,7 +25,7 @@ const Mat = struct {
     };
   }
   /// Dot products this matrix by matrix B, storing its result in dest
-  pub fn dot(self: *Mat, dest: *Mat, B: *Mat) !void {
+  pub fn dot(self: *const Mat, dest: *Mat, B: *Mat) !void {
     if (self.cols != B.rows) {
         return error.InvalidMatrixLength;
     }
@@ -33,6 +33,17 @@ const Mat = struct {
         for(B.cols) |c| {
             dest[r][c] = self.m[r][c] * B.m[r][c];
         }
+    }
+  }
+
+  /// Print visual representation of matrix
+  pub fn print(self: *const Mat) void {
+    for (self.m) |*row| {
+        stdprint("[ ", .{});
+        for (row.*) |*col| {
+            stdprint("{d} ", .{col.*});
+        }
+        stdprint("]\n", .{});
     }
   }
 };
@@ -46,5 +57,5 @@ pub fn main() !void {
     const matrix = try Mat.New(rows, cols, &alo.allocator());
     // _ = matrix;
     matrix.m[0][1] = 1;
-    print("{d}\n", .{matrix.m[0][1]});
+    matrix.print();
 }
