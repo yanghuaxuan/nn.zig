@@ -5,9 +5,10 @@ const Allocator = std.mem.Allocator;
 const Mat = struct {
   rows: usize,
   cols: usize,
-  m: *const [][]f32,
+  m: [][]f32,
 
 
+  /// Returns a new dynamically allocated matrix
   pub fn New(rows: usize, cols: usize, allocator: *const Allocator) !Mat {
     const m = try allocator.alloc([]f32, @sizeOf(f32) * rows);
     // var start: usize = 0;
@@ -20,7 +21,7 @@ const Mat = struct {
     return Mat {
         .rows = rows,
         .cols = cols,
-        .m = &m
+        .m = m
     };
   }
   /// Dot products this matrix by matrix B, storing its result in dest
@@ -43,6 +44,7 @@ pub fn main() !void {
     defer alo.deinit();
 
     const matrix = try Mat.New(rows, cols, &alo.allocator());
-    matrix.m.*[0][1] = 1;
-    print("{d}\n", .{matrix.m.*[0][1]});
+    // _ = matrix;
+    matrix.m[0][1] = 1;
+    print("{d}\n", .{matrix.m[0][1]});
 }
