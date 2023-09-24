@@ -8,6 +8,7 @@ const Mat = struct {
   rows: usize,
   cols: usize,
   m: [][]f32,
+  allocator: *const Allocator,
 
   /// Returns a new initialized matrix
   pub fn New(rows: usize, cols: usize, allocator: *const Allocator) !Mat {
@@ -22,20 +23,21 @@ const Mat = struct {
     return Mat {
         .rows = rows,
         .cols = cols,
-        .m = m
+        .m = m,
+        .allocator = allocator,
     };
   }
   /// Dot products this matrix by matrix B, returning its result as another matrix
   ///
   /// Returns an error if the number of rows in matrix B != number of cols in this matrix
-  pub fn Dot(self: *const Mat, B: *Mat, alo: *const Allocator) !Mat {
+  pub fn Dot(self: *const Mat, B: *Mat) !Mat {
     if (self.cols != B.rows) {
         return error.InvalidMatrixLength;
     }
     const row = self.rows;
     const col = self.cols;
 
-    const m = Mat.New(row, col, alo);
+    const m = Mat.New(row, col);
 
     for (self.rows) |r| {
         for(B.cols) |c| {
@@ -46,22 +48,15 @@ const Mat = struct {
     return m;
   }
 
-  pub fn At(self: *const Mat, row: usize, col: usize) ?f32 {
-    if (row > self.rows or col > self.cols) {
-        return null;
-    }
-    return self.m[row][col];
-  }
-
   /// Add this matrix by B, returning its result as another matrix
   ///
   /// Returns an error if dimensions of matrix B are not the same
-  pub fn Add(self: *const Mat, B: *const Mat, alo: *const Allocator) !Mat {
+  pub fn Add(self: *const Mat, B: *const Mat) !Mat {
     if (self.rows != B.rows or self.cols != self.rows) {
         return error.InvalidMatrixLength;
     }
 
-    const m = try Mat.New(self.rows, self.cols, alo);
+    const m = try Mat.New(self.rows, self.cols, self.allocator);
 
     for (0..self.rows) |i| {
         for (0..self.cols) |j| {
@@ -70,6 +65,13 @@ const Mat = struct {
     }
     
     return m;
+  }
+
+  pub fn At(self: *const Mat, row: usize, col: usize) ?f32 {
+    if (row > self.rows or col > self.cols) {
+        return null;
+    }
+    return self.m[row][col];
   }
 
   /// Print visual representation of matrix
@@ -81,6 +83,21 @@ const Mat = struct {
         }
         stdprint("]\n", .{});
     }
+  }
+
+  /// Free memory allocated for self.*m*
+  ///
+  /// Should be called once the matrix is not needed anymore
+  ///
+  /// ```
+  /// const m = try Mat.New(1, 1, &alo.allocator());
+  /// defer m.Free()
+  /// ```
+  pub fn Free(self: *const Mat) void {
+    for (self.m) |*row| {
+       self.allocator.free(row.*);
+    }
+    self.allocator.free(self.m);
   }
 
   /// Randomize values in matrix
@@ -107,6 +124,7 @@ pub fn main() !void {
     const cols = 2;
 
     const matrix = try Mat.New(rows, cols, &alo.allocator());
+    // defer matrix.Free();
     // _ = matrix;
     matrix.m[0][1] = 1;
     matrix.Print();
@@ -119,9 +137,12 @@ pub fn main() !void {
     stdprint("\n", .{});
 
     const twobytwo_1 = try Mat.New(2, 2, &alo.allocator());
+    defer twobytwo_1.Free();
     const twobytwo_2 = try Mat.New(2, 2, &alo.allocator());
+    defer twobytwo_2.Free();
+
     twobytwo_1.Randomize(1, 2);
     twobytwo_2.Randomize(1, 2);
-    const res = try twobytwo_1.Add(&twobytwo_2, &alo.allocator());
+    const res = try twobytwo_1.Add(&twobytwo_2);
     res.Print();
 }
