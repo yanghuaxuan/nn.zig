@@ -2,6 +2,7 @@ const std = @import("std");
 
 const stdprint = std.debug.print;
 const Allocator = std.mem.Allocator;
+const assert = std.debug.assert;
 
 /// The *real* matrix is dynamically allocated
 const Mat = struct {
@@ -27,21 +28,27 @@ const Mat = struct {
         .allocator = allocator,
     };
   }
-  /// Dot products this matrix by matrix B, returning its result as another matrix
+  /// Multiply this matrix by matrix B, returning its result as another matrix
   ///
   /// Returns an error if the number of rows in matrix B != number of cols in this matrix
-  pub fn Dot(self: *const Mat, B: *Mat) !Mat {
+  pub fn Mul(self: *const Mat, B: *const Mat) !Mat {
     if (self.cols != B.rows) {
         return error.InvalidMatrixLength;
     }
     const row = self.rows;
-    const col = self.cols;
+    const col = B.cols;
 
-    const m = Mat.New(row, col);
+    const m = try Mat.New(row, col, self.allocator);
 
-    for (self.rows) |r| {
-        for(B.cols) |c| {
-            m.m[r][c] = self.m[r][c] * B.m[r][c];
+    for (0..self.rows) |i| {
+        for (0..B.cols) |j| {
+            var sum: f32 = 0;
+
+            for (0..self.cols) |k| {
+                sum += self.m[i][k] * B.m[k][j];
+            }
+
+            m.m[i][j] = sum;
         }
     }
 
@@ -65,13 +72,6 @@ const Mat = struct {
     }
     
     return m;
-  }
-
-  pub fn At(self: *const Mat, row: usize, col: usize) ?f32 {
-    if (row > self.rows or col > self.cols) {
-        return null;
-    }
-    return self.m[row][col];
   }
 
   /// Print visual representation of matrix
@@ -100,6 +100,32 @@ const Mat = struct {
     self.allocator.free(self.m);
   }
 
+  // Fills all elements in matrix with val
+  pub fn Fill(self: *const Mat, val: f32) void {
+    for (self.m) |*row| {
+        for (row.*) |*col| {
+            col.* = val;
+        }
+    }
+  }
+
+  // Returns true if all elements in B are the same
+  pub fn Eq(self: *const Mat, B: *const Mat) bool {
+    if (self.rows != B.rows or self.cols != B.cols) {
+        return false;
+    }
+
+    for (0..self.rows) |r| {
+        for (0..self.cols) |c| {
+           if (self.m[r][c] != B.m[r][c]) {
+                return false;
+           }
+        }
+    }
+
+    return true;
+  }
+
   /// Randomize values in matrix
   pub fn Randomize(self: *const Mat, floor: i32, ceil: i32) void {
     const cTime = @cImport(@cInclude("time.h"));
@@ -115,6 +141,56 @@ const Mat = struct {
     }
   }
 };
+
+    
+test "Matrix Eq works" {
+    const alo = std.testing.allocator;
+
+    const mat12_1 = try Mat.New(3, 3, &alo);
+    defer mat12_1.Free();
+    const mat12_2 = try Mat.New(3, 3, &alo);
+    defer mat12_2.Free();
+    mat12_1.Fill(12);
+    mat12_2.Fill(12);
+
+    const mat2 = try Mat.New(3, 3, &alo);
+    defer mat2.Free();
+    mat2.Fill(1);
+
+    assert(mat12_1.Eq(&mat12_2));
+    assert(!mat2.Eq(&mat12_2));
+}
+
+test "Matrix multiplication works" {
+    const alo = std.testing.allocator;
+
+    // 2 2 2
+    // 2 2 2
+    const twobythree = try Mat.New(2, 3, &alo);
+    defer twobythree.Free();
+    // 3 3
+    // 3 3
+    // 3 3
+    const threebytwo = try Mat.New(3, 2, &alo);
+    defer threebytwo.Free();
+    threebytwo.Fill(2);
+    twobythree.Fill(3);
+    const res_1 = try threebytwo.Mul(&twobythree);
+    defer res_1.Free();
+    const expected_1 = try Mat.New(3, 3, &alo);
+    expected_1.Fill(12);
+    defer expected_1.Free();
+    assert(expected_1.Eq(&res_1));
+
+    const one = try Mat.New(1, 1, &alo);
+    defer one.Free();
+    const two = try Mat.New(1, 1, &alo);
+    defer two.Free();
+    one.Fill(1);
+    two.Fill(2);
+    const res_2 = try one.Mul(&two);
+    defer res_2.Free();
+}
 
 pub fn main() !void {
     var alo = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -136,13 +212,18 @@ pub fn main() !void {
 
     stdprint("\n", .{});
 
-    const twobytwo_1 = try Mat.New(2, 2, &alo.allocator());
-    defer twobytwo_1.Free();
-    const twobytwo_2 = try Mat.New(2, 2, &alo.allocator());
-    defer twobytwo_2.Free();
+    const twobythree_1 = try Mat.New(2, 3, &alo.allocator());
+    defer twobythree_1.Free();
+    const threebytwo_2 = try Mat.New(3, 2, &alo.allocator());
+    defer threebytwo_2.Free();
 
-    twobytwo_1.Randomize(1, 2);
-    twobytwo_2.Randomize(1, 2);
-    const res = try twobytwo_1.Add(&twobytwo_2);
-    res.Print();
+    // const sum_res = try twobythree_1.Add(&threebytwo_2);
+    // sum_res.Print();
+
+    stdprint("\n", .{});
+
+    stdprint("Multiplying ...\n", .{});
+    //const dot_res = try twobythree_1.Dot(&threebytwo_2);
+    const dot_res = try twobythree_1.Mul(&threebytwo_2);
+    dot_res.Print();
 }
